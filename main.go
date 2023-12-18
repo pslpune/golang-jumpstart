@@ -5,9 +5,11 @@ package main
 ===========================*/
 import (
 	"flag"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pslpune/golang-jumpstart/auth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,6 +33,25 @@ func init() {
 	log.SetOutput(os.Stdout)     // FLogF will set it main, but dfault is stdout
 	log.SetLevel(log.DebugLevel) // default level info debug but FVerbose will set it main
 	logFile = os.Getenv("LOGF")
+}
+
+func HandlLogin(c *gin.Context) {
+	u := auth.NewUser("someone", "some.one@example.com", "timbaktoo", "9845353=3453")
+	if u == nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	log.Debug(u.Details())
+	yes, _ := u.(auth.Auth).Exists()
+	if !yes {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	yes, err := u.(auth.Auth).Login("examplepassword")
+	if err != nil || !yes {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
 }
 
 func main() {
@@ -59,11 +80,12 @@ func main() {
 	r := gin.Default()
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"app":    "Telegram scraper",
-			"author": "kneerunjun@gmail.com",
-			"date":   "November 2023",
-			"msg":    "If you are able to see this, you know the telegram scraper is working fine",
+			"app":    "Demo application",
+			"author": "niranjan_awati@persistent.com",
+			"date":   "December 2023",
+			"msg":    "If you can see this, its probably running fine",
 		})
 	})
+	r.POST("/users/:id", HandlLogin)
 	log.Fatal(r.Run(":8080"))
 }
