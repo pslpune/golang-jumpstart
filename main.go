@@ -16,6 +16,14 @@ import (
 var (
 	FVerbose, FLogF, FSeed bool
 	logFile                string
+	allUsers               []auth.User = []auth.User{
+		&auth.AnyUser{Name: "Querida Fortnam", Email: "qfortnam0@desdev.cn", Loc: "Philippines"},
+		&auth.AnyUser{Name: "Vanessa Fay", Email: "vfay1@ning.com", Loc: "Venezuela"},
+		&auth.AnyUser{Name: "Christoforo Birdfield", Email: "cbirdfield2@mapy.cz", Loc: "China"},
+		&auth.AnyUser{Name: "Beatrix Dottridge", Email: "bdottridge3@alexa.com", Loc: "China"},
+		&auth.AnyUser{Name: "Holly Rubert", Email: "hruberti4@cdbaby.com", Loc: "Indonesia"},
+		&auth.AnyUser{Name: "Lexy Fendt", Email: "lfendt5@edublogs.org", Loc: "Philippines"},
+	} // in memory database of the registerd users
 )
 
 func init() {
@@ -33,10 +41,25 @@ func init() {
 	log.SetOutput(os.Stdout)     // FLogF will set it main, but dfault is stdout
 	log.SetLevel(log.DebugLevel) // default level info debug but FVerbose will set it main
 	logFile = os.Getenv("LOGF")
+	log.WithFields(log.Fields{
+		"count": len(allUsers),
+	}).Debug("database loaded")
+}
+
+func HandlGetUser(c *gin.Context) {
+	for idx, usr := range allUsers {
+		if email, _ := c.Params.Get("email"); email == usr.(*auth.AnyUser).Email {
+			log.WithFields(log.Fields{
+				"index": idx,
+			}).Debug("user found")
+			c.AbortWithStatus(http.StatusOK)
+		}
+	}
+	c.AbortWithStatus(http.StatusNotFound)
 }
 
 func HandlLogin(c *gin.Context) {
-	u := auth.NewUser("someone", "some.one@example.com", "timbaktoo", "9845353=3453")
+	u := auth.NewUser("someone", "some.one@example.com", "timbaktoo", "98453533453")
 	if u == nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -47,11 +70,17 @@ func HandlLogin(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	yes, err := u.(auth.Auth).Login("examplepassword")
-	if err != nil || !yes {
+	claim, _ := c.Params.Get("password")
+	yes, err := u.(auth.Auth).Login(claim)
+	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
+	if !yes {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	c.AbortWithStatus(http.StatusOK)
 }
 
 func main() {
@@ -87,5 +116,6 @@ func main() {
 		})
 	})
 	r.POST("/users/:id", HandlLogin)
+	r.GET("/users/:email", HandlGetUser)
 	log.Fatal(r.Run(":8080"))
 }
