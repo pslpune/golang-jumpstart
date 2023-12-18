@@ -1,16 +1,22 @@
 package main
 
 /* ========================
-
+This is a demo project and the only purpose of this code is walk the candidates thru the code structure
+While the code does run and starts an HTTP web api server it has no utility whatsoever.
 ===========================*/
 import (
 	"flag"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pslpune/golang-jumpstart/auth"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	DELAY = 3 * time.Second
 )
 
 var (
@@ -29,6 +35,9 @@ var (
 func init() {
 	/* -------------
 	Setting up log configuration for the api
+	or reading values from the environment
+	global database connections maybe
+	global cache connections
 	----------------*/
 	log.SetFormatter(&log.TextFormatter{
 		DisableColors: false,
@@ -55,6 +64,7 @@ func HandlGetUser(c *gin.Context) {
 			c.AbortWithStatus(http.StatusOK)
 		}
 	}
+	<-time.After(DELAY) // deliberate delay in sequential process.
 	c.AbortWithStatus(http.StatusNotFound)
 }
 
