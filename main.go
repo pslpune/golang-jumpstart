@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	
 	"github.com/gin-gonic/gin"
 	"github.com/pslpune/golang-jumpstart/auth"
 	log "github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ const (
 )
 
 var (
+	Temp =90.00
 	FVerbose, FLogF, FSeed bool
 	logFile                string
 	allUsers               []auth.User = []auth.User{
@@ -53,6 +55,8 @@ func init() {
 	log.WithFields(log.Fields{
 		"count": len(allUsers),
 	}).Debug("database loaded")
+	
+	
 }
 
 func HandlGetUser(c *gin.Context) {
