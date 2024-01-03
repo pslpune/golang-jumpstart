@@ -1,69 +1,85 @@
 package main
 
+import "fmt"
+
 /* ========================
 
 ===========================*/
-import (
-	"flag"
-	"os"
 
-	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
-)
+// Why What When Where How
+// Why do we need structs ?
+// Coherent, loosely coupled :
+/*
+S - Single responsibilty principle
+O - Open closed principle - open for extension and closed for modification
+// L - Liskov substituition
+I - Interface based design
+D - Dependency injection
+*/
+// class
 
-var (
-	FVerbose, FLogF, FSeed bool
-	logFile                string
-)
-
-func init() {
-	/* -------------
-	Setting up log configuration for the api
-	----------------*/
-	log.SetFormatter(&log.TextFormatter{
-		DisableColors: false,
-		FullTimestamp: false,
-		ForceColors:   true,
-		PadLevelText:  true,
-	})
-	log.SetReportCaller(false)
-	// By default the log output is stdout and the level is info
-	log.SetOutput(os.Stdout)     // FLogF will set it main, but dfault is stdout
-	log.SetLevel(log.DebugLevel) // default level info debug but FVerbose will set it main
-	logFile = os.Getenv("LOGF")
+type Employee struct {
+	Yoe     int
+	Email   string
+	Name    string
+	Address []string
+	ID      int
 }
 
+var (
+	emploeeYoe                  int
+	employeeEmail, employeeName string
+	employeeAddress             []string
+	employeeId                  int
+)
+
+func InductNewEmployee() error {
+	return nil
+}
+
+// data + methods = responsibility
+
 func main() {
-	flag.Parse() // command line flags are parsed
-	log.WithFields(log.Fields{
-		"verbose": FVerbose,
-		"flog":    FLogF,
-		"seed":    FSeed,
-	}).Info("Log configuration..")
-	if FVerbose {
-		log.SetLevel(log.DebugLevel)
+	someRndNum := 420
+	var ptrToNum *int // what would be the default value ?
+	fmt.Println(ptrToNum)
+	ptrToNum = &someRndNum // memory address assignment
+	fmt.Println(*ptrToNum) // deref operation
+	fmt.Println(ptrToNum)  // memory location
+
+	fmt.Printf("%T\n", ptrToNum)
+	// Stack - 0xc000096010
+	// Heap - 0xc000096010, 0xc000096001 -0xc000096009
+	//           0
+	// size := new(int)
+	// {}
+	sampleMap := make(map[string]int)     // reference types, complex types
+	ptrToSampleMap := new(map[string]int) //  basic types
+	// count := make(int) // does not work, works only with cha, maps, slices
+	// Heap map[string]int(0xc000096005)
+	//          ^
+	// Stack (sampleMap)0xc000096005 (0xd000096005)
+	//         ^
+	// Stack (ptrSampleMap)0xd000096005 (...)
+	size := 0
+	fmt.Printf("size before modification %d\n", size)
+	modify(&size)
+	fmt.Printf("size after modification %d\n", size)
+
+	emp  := Employee{
+		Yoe: 18,
+		Email: "",
+		Name: "",
+		Address: []string{},
+		ID: 89895432,
+
 	}
-	if FLogF {
-		lf, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0664)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"err": err,
-			}).Error("Failed to connect to log file, kindly check the privileges")
-		} else {
-			log.Infof("Check log file for entries @ %s", logFile)
-			log.SetOutput(lf)
-		}
-	}
-	log.Info("Now starting the telegram scraper microservice")
-	gin.SetMode(gin.DebugMode)
-	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"app":    "Telegram scraper",
-			"author": "kneerunjun@gmail.com",
-			"date":   "November 2023",
-			"msg":    "If you are able to see this, you know the telegram scraper is working fine",
-		})
-	})
-	log.Fatal(r.Run(":8080"))
+
+	fmt.Println(emp.Yoe)
+
+}
+
+func modify(p *int) error {
+	*p = 100
+	return nil
 }
