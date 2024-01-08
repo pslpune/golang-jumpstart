@@ -2,30 +2,22 @@ package sensors
 
 import "fmt"
 
-type Sensor interface {
+type Sensor struct {
 	
 }
 type Device struct {
 }
 
-// DHT11 is a type of Sensor
-// DHT11 contains all the properties sensor
-// dht11 - temp & RH
-type DHT11 struct {
-	Callout   string
-	SnsrField Sensor // Anonymous field specification
-	Dev       Device // Anon field specification
-}
 
+type DHT11 struct {
+	
+}
 // smoke, co, co2, no3
 type MQ135 struct {
 }
 
 // butane gas leak detection
 type MQ7 struct {
-}
-type Motherboard struct {
-	string // anon string field
 }
 
 // interface{} - does NOT mean instantiation, nor does it mean declaration, its a predefined data type regarded as grandfather of all types
@@ -39,6 +31,7 @@ func Calibrate(typeOfSensor string, calibration float32) (interface{}, error) {
 	} else if typeOfSensor == "MQ7" {
 		return &MQ7{}, nil
 	}
+
 	return nil, nil
 }
 
@@ -49,7 +42,5 @@ func Setup() error {
 		return fmt.Errorf("failed setup , try again with other params")
 	}
 
-	ptrDHT11 := itf.(*DHT11) //downcasting
-	fmt.Println(ptrDHT11.SnsrField.ID)
-	fmt.Println(ptrDHT11.Callout)
+	return nil
 }
