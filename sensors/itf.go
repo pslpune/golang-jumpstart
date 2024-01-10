@@ -16,11 +16,25 @@ import "fmt"
 type Sensor interface {
 	PinSetup(pwr, gnd, trigg, op int) error
 }
+
+type Power interface {
+	PowerOn() error
+	PowerOff()
+}
+
 type Device struct {
 }
 
 type DHT11 struct {
 	PWRpin, GNDpin, OPpin int
+}
+
+func (dht *DHT11) PowerOn() error {
+	return nil
+}
+
+func (dht *DHT11) PowerOff() {
+
 }
 
 // this is called monkey-patching
@@ -34,6 +48,14 @@ func (dht *DHT11) PinSetup(pwr, gnd, trigg, op int) error {
 // smoke, co, co2, no3
 type MQ135 struct {
 	PWRpin, GNDpin, OPpin, Triggpin int
+}
+
+func (mq135 *MQ135) PowerOn() error {
+	return nil
+}
+
+func (mq135 *MQ135) PowerOff() {
+	
 }
 
 func (mq135 *MQ135) PinSetup(pwr, gnd, trigg, op int) error {
@@ -142,10 +164,25 @@ func Setup() error {
 	if err != nil || sensor == nil {
 		return fmt.Errorf("failed setup , try again with other params")
 	}
+	// always remember what is the object underlying - &DHT11{}
+	sensor.(Power).PowerOn()
+	sensor.(Power).PowerOff()
+
 	sensor, err = Calibrate("MQ135", SetOfPinsForCalibrate{Pwr: 2, Gnd: 9, Trigg: 17, Op: 39})
 	if err != nil || sensor == nil {
 		return fmt.Errorf("failed setup , try again with other params")
 	}
+	sensor.(Power).PowerOn()
+	sensor.(Power).PowerOff()
 
+	sensor, err = Calibrate("MQ7", SetOfPinsForCalibrate{Pwr: 2, Gnd: 9, Trigg: 17, Op: 39})
+	if err != nil || sensor == nil {
+		return fmt.Errorf("failed setup , try again with other params")
+	}
+	power, ok :=sensor.(Power)
+	if !ok || power == nil {
+		fmt.Println("mq7 sensor does not implement the power interface")
+	}
+	sensor.(Power).PowerOn()
 	return nil
 }
