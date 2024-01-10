@@ -5,114 +5,64 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 )
 
-const (
-	MAX_THREADS = 10
-)
-
+// Parallel - what do you mean by that ? Core 1 (CPU1) - task A || Core 2 (CPU2) - task B
+// Core 2 Duo Core 1 (4 threads) (clocks, Clockd speed 2 Ghz - in a single sec it is capable of taking 2x10^12 instructions , FSB) = Thread 1 -task A || Thread 2 - TaskB || Thread 3 || Thread4
+// Being AGNOSTIC of whether it is scheduled on single core or multicore when a language lets you program uniformly its called *asynchrnoy*
 func main() {
+	fmt.Println("now learning asynchrony in Go")
+	// comic, err := DownloadComic(100)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(comic["safe_title"])
 	jobs := []int{}
-	for i := 100; i <= 120; i++ {
+	for i := 100; i < 120; i++ {
 		jobs = append(jobs, i)
 	}
-	jobsStack := make(chan int, len(jobs))
-	for _, j := range jobs {
-		jobsStack <- j
-	}
-	close(jobsStack)
-	// done := make(chan bool, 1)
-	var wg sync.WaitGroup
-	results := make(chan map[string]interface{}, 20)
 
-	for i := 0; i < MAX_THREADS; i++ {
-		wg.Add(1)
-		go func(jobs chan int) {
-			defer wg.Done()
-			for j := range jobs {
-				result, err := DownloadComic(j)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				results <- result
+	go func() { // Go routine
+		for _, j := range jobs {
+			comic, err := DownloadComic(j)
+			if err != nil {
+				fmt.Printf("error downloading the comic %s", err)
+			} else {
+				fmt.Println(comic["safe_title"])
 			}
-		}(jobsStack)
-	}
-	go func() {
-		for r := range results {
-			fmt.Println(r["safe_title"])
 		}
-	}()
-	/*
-		This is when we just make a async job for all the download jobs
-		and the results are passed back to the main thread on the channel instead of the thread printing it
-	*/
-	// go func(done chan bool) {
-	// 	for _, j := range jobs {
-	// 		result, err := DownloadComic(j)
-	// 		if err != nil {
-	// 			fmt.Println(err)
-	// 		}
-	// 		results <- result
-	// 	}
-	// 	done <- true
-	// }(done)
-	// for r := range results {
-	// 	fmt.Println(r)
-	// }
-	// <-done
-
-	/*
-		No
-	*/
-	// var wg sync.WaitGroup
-	// for _, j := range jobs {
-	// 	wg.Add(1)
-	// 	go func(j int) {
-	// 		result, err := DownloadComic(j)
-	// 		if err != nil {
-	// 			fmt.Println(err)
-	// 		}
-	// 		fmt.Println(result)
-	// 		wg.Done()
-	// 	}(j)
-	// }
-	wg.Wait()
-	close(results)
-	fmt.Println("We are now closing the xkcd task")
+	}() // IIFE -  immediately invoked function expression
+	fmt.Println("End of the program")
 }
 
 func DownloadComic(comicIndex int) (map[string]interface{}, error) {
-
 	url := fmt.Sprintf("https://xkcd.com/%d/info.0.json", comicIndex)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new request %s", err)
 	}
 	cl := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 4 * time.Second,
 	}
 	resp, err := cl.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing the request %s", err)
+		return nil, fmt.Errorf("failed to send request over http %s", err)
 	}
-	if resp.StatusCode == http.StatusOK {
-		// process the payload
-		byt, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error reading response payload from xkcd.com %s", err)
-		}
-		payload := map[string]interface{}{}
-		err = json.Unmarshal(byt, &payload)
-		if err != nil {
-			return nil, fmt.Errorf("error unmarshaling payload in response %s", err)
-		}
-		// once we have payload we then just pass it back to the calling function
-		return payload, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get favorable response from server %d", resp.StatusCode)
 	}
-	// else in this case we have an error
-	return nil, fmt.Errorf("unfavorable http code %d", resp.StatusCode)
+	// this is wehre we read the json response payload
+	defer resp.Body.Close()
+	byt, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("invalid json payload from server %s", err)
+	}
+	// defer // this is the first time i have used it ! .. will come to this a bit later
+	result := map[string]interface{}{}
+	err = json.Unmarshal(byt, &result)
+	if err != nil {
+		return nil, fmt.Errorf("fauled to read payload from server %s", err)
+	}
+	return result, nil
 }
