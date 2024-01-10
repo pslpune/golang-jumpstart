@@ -1,69 +1,118 @@
 package main
 
-/* ========================
-
-===========================*/
 import (
-	"flag"
-	"os"
-
-	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"sync"
+	"time"
 )
 
-var (
-	FVerbose, FLogF, FSeed bool
-	logFile                string
+const (
+	MAX_THREADS = 10
 )
-
-func init() {
-	/* -------------
-	Setting up log configuration for the api
-	----------------*/
-	log.SetFormatter(&log.TextFormatter{
-		DisableColors: false,
-		FullTimestamp: false,
-		ForceColors:   true,
-		PadLevelText:  true,
-	})
-	log.SetReportCaller(false)
-	// By default the log output is stdout and the level is info
-	log.SetOutput(os.Stdout)     // FLogF will set it main, but dfault is stdout
-	log.SetLevel(log.DebugLevel) // default level info debug but FVerbose will set it main
-	logFile = os.Getenv("LOGF")
-}
 
 func main() {
-	flag.Parse() // command line flags are parsed
-	log.WithFields(log.Fields{
-		"verbose": FVerbose,
-		"flog":    FLogF,
-		"seed":    FSeed,
-	}).Info("Log configuration..")
-	if FVerbose {
-		log.SetLevel(log.DebugLevel)
+	jobs := []int{}
+	for i := 100; i <= 120; i++ {
+		jobs = append(jobs, i)
 	}
-	if FLogF {
-		lf, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0664)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"err": err,
-			}).Error("Failed to connect to log file, kindly check the privileges")
-		} else {
-			log.Infof("Check log file for entries @ %s", logFile)
-			log.SetOutput(lf)
+	jobsStack := make(chan int, len(jobs))
+	for _, j := range jobs {
+		jobsStack <- j
+	}
+	close(jobsStack)
+	// done := make(chan bool, 1)
+	var wg sync.WaitGroup
+	results := make(chan map[string]interface{}, 20)
+
+	for i := 0; i < MAX_THREADS; i++ {
+		wg.Add(1)
+		go func(jobs chan int) {
+			defer wg.Done()
+			for j := range jobs {
+				result, err := DownloadComic(j)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				results <- result
+			}
+		}(jobsStack)
+	}
+	go func() {
+		for r := range results {
+			fmt.Println(r["safe_title"])
 		}
+	}()
+	/*
+		This is when we just make a async job for all the download jobs
+		and the results are passed back to the main thread on the channel instead of the thread printing it
+	*/
+	// go func(done chan bool) {
+	// 	for _, j := range jobs {
+	// 		result, err := DownloadComic(j)
+	// 		if err != nil {
+	// 			fmt.Println(err)
+	// 		}
+	// 		results <- result
+	// 	}
+	// 	done <- true
+	// }(done)
+	// for r := range results {
+	// 	fmt.Println(r)
+	// }
+	// <-done
+
+	/*
+		No
+	*/
+	// var wg sync.WaitGroup
+	// for _, j := range jobs {
+	// 	wg.Add(1)
+	// 	go func(j int) {
+	// 		result, err := DownloadComic(j)
+	// 		if err != nil {
+	// 			fmt.Println(err)
+	// 		}
+	// 		fmt.Println(result)
+	// 		wg.Done()
+	// 	}(j)
+	// }
+	wg.Wait()
+	close(results)
+	fmt.Println("We are now closing the xkcd task")
+}
+
+func DownloadComic(comicIndex int) (map[string]interface{}, error) {
+
+	url := fmt.Sprintf("https://xkcd.com/%d/info.0.json", comicIndex)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new request %s", err)
 	}
-	log.Info("Now starting the telegram scraper microservice")
-	gin.SetMode(gin.DebugMode)
-	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"app":    "Telegram scraper",
-			"author": "kneerunjun@gmail.com",
-			"date":   "November 2023",
-			"msg":    "If you are able to see this, you know the telegram scraper is working fine",
-		})
-	})
-	log.Fatal(r.Run(":8080"))
+	cl := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := cl.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing the request %s", err)
+	}
+	if resp.StatusCode == http.StatusOK {
+		// process the payload
+		byt, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading response payload from xkcd.com %s", err)
+		}
+		payload := map[string]interface{}{}
+		err = json.Unmarshal(byt, &payload)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling payload in response %s", err)
+		}
+		// once we have payload we then just pass it back to the calling function
+		return payload, nil
+	}
+	// else in this case we have an error
+	return nil, fmt.Errorf("unfavorable http code %d", resp.StatusCode)
 }
