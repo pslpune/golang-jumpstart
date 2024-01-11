@@ -23,16 +23,42 @@ func main() {
 		jobs = append(jobs, i)
 	}
 
-	go func() { // Go routine
-		for _, j := range jobs {
-			comic, err := DownloadComic(j)
-			if err != nil {
-				fmt.Printf("error downloading the comic %s", err)
-			} else {
-				fmt.Println(comic["safe_title"])
+	// defer close(results)
+	// Non blocking operation
+	// channel rules
+
+	// Reading empty channels & Writing to full channels is blocking
+	// Writing on closed channels results in a panic, exception
+	// Reading from nil channels will result in a panic
+	_, done := func() (chan map[string]interface{}, chan bool) { // Go routine
+		results := make(chan map[string]interface{}, 20)
+		done := make(chan bool, 1)
+		// var results chan map[string]interface{}
+		go func() {
+			// defer close(done)
+			defer close(results)
+			for _, j := range jobs {
+				comic, err := DownloadComic(j)
+				if err != nil {
+					fmt.Printf("error downloading the comic %s", err)
+				} else {
+					// instead of printing the safe title here lets go ahead to print the same in the main thread
+					fmt.Println(comic["safe_title"])
+					// results <- comic
+				}
 			}
-		}
+			done <- false
+		}()
+		return results, done
+		// while you can read from closed channels, you cannot write into closed channels
+		// reading on empty channels is a blocking operation
+		// go func() {
+		// }()
 	}() // IIFE -  immediately invoked function expression
+	<-done
+	// for comic := range results {
+	// 	fmt.Println(comic["safe_title"])
+	// }
 	fmt.Println("End of the program")
 }
 
