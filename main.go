@@ -5,7 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
+)
+
+const (
+	MAX_THREAD_POOL = 10
 )
 
 // Parallel - what do you mean by that ? Core 1 (CPU1) - task A || Core 2 (CPU2) - task B
@@ -22,43 +27,37 @@ func main() {
 	for i := 100; i < 120; i++ {
 		jobs = append(jobs, i)
 	}
+	// chnResults := make(chan map[string]interface{}, len(jobs))
+	// defer close(chnResults)
+	// task - 1,2,3,4,5  .. 20 Asynchronous
+	// task 4 is picked up for execution
+	var wg sync.WaitGroup
+	chnResults := make(chan map[string]interface{}, len(jobs))
+	defer close(chnResults)
+	// a pool of go-routines (referred to as thread pools in other platforms)
+	// a fixed set of go routines then cyclically takes up all the jobs one after other.
+	// this saves penalty for creation, destroy and somewhat from scheduling each go-routine.
 
-	// defer close(results)
-	// Non blocking operation
-	// channel rules
-
-	// Reading empty channels & Writing to full channels is blocking
-	// Writing on closed channels results in a panic, exception
-	// Reading from nil channels will result in a panic
-	_, done := func() (chan map[string]interface{}, chan bool) { // Go routine
-		results := make(chan map[string]interface{}, 20)
-		done := make(chan bool, 1)
-		// var results chan map[string]interface{}
-		go func() {
-			// defer close(done)
-			defer close(results)
-			for _, j := range jobs {
-				comic, err := DownloadComic(j)
-				if err != nil {
-					fmt.Printf("error downloading the comic %s", err)
-				} else {
-					// instead of printing the safe title here lets go ahead to print the same in the main thread
-					fmt.Println(comic["safe_title"])
-					// results <- comic
-				}
+	for _, j := range jobs {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			result, err := DownloadComic(idx)
+			if err != nil {
+				fmt.Println("We have an error downloading the comic")
+				return
 			}
-			done <- false
-		}()
-		return results, done
-		// while you can read from closed channels, you cannot write into closed channels
-		// reading on empty channels is a blocking operation
-		// go func() {
-		// }()
-	}() // IIFE -  immediately invoked function expression
-	<-done
-	// for comic := range results {
-	// 	fmt.Println(comic["safe_title"])
-	// }
+			// fmt.Println(result["safe_title"])
+			chnResults <- result
+		}(j)
+	}
+	go func(chnRead chan map[string]interface{}) {
+		for r := range chnRead {
+			fmt.Println(r["safe_title"])
+		}
+	}(chnResults)
+	wg.Wait()
+	// <- time.After(1*time.Second)
 	fmt.Println("End of the program")
 }
 
