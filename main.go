@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	MAX_THREAD_POOL = 10
+	MAX_THREAD_POOL = 33
+	MAX_JOBS        = 50
 )
 
 // Parallel - what do you mean by that ? Core 1 (CPU1) - task A || Core 2 (CPU2) - task B
@@ -23,42 +24,47 @@ func main() {
 	// 	fmt.Println(err)
 	// }
 	// fmt.Println(comic["safe_title"])
-	jobs := []int{}
-	for i := 100; i < 120; i++ {
-		jobs = append(jobs, i)
+	jobs := make(chan int, MAX_JOBS)
+	for i := 100; i < (100 + MAX_JOBS); i++ {
+		jobs <- i
 	}
+	close(jobs)
 	// chnResults := make(chan map[string]interface{}, len(jobs))
 	// defer close(chnResults)
 	// task - 1,2,3,4,5  .. 20 Asynchronous
 	// task 4 is picked up for execution
-	var wg sync.WaitGroup
-	chnResults := make(chan map[string]interface{}, len(jobs))
-	defer close(chnResults)
+
 	// a pool of go-routines (referred to as thread pools in other platforms)
 	// a fixed set of go routines then cyclically takes up all the jobs one after other.
 	// this saves penalty for creation, destroy and somewhat from scheduling each go-routine.
-
-	for _, j := range jobs {
+	var wg sync.WaitGroup
+	now := time.Now()
+	for i := 0; i < MAX_THREAD_POOL; i++ { //4
 		wg.Add(1)
-		go func(idx int) {
+		go func(jobs chan int) {
 			defer wg.Done()
-			result, err := DownloadComic(idx)
-			if err != nil {
-				fmt.Println("We have an error downloading the comic")
-				return
+			for j := range jobs {
+				result, err := DownloadComic(j)
+				if err != nil {
+					fmt.Printf("error downloading job %s", err)
+				}
+				fmt.Println(result["safe_title"])
 			}
-			// fmt.Println(result["safe_title"])
-			chnResults <- result
-		}(j)
+
+		}(jobs)
 	}
-	go func(chnRead chan map[string]interface{}) {
-		for r := range chnRead {
-			fmt.Println(r["safe_title"])
-		}
-	}(chnResults)
+
+	// go func(chnRead chan map[string]interface{}) {
+	// 	for r := range chnRead {
+	// 		fmt.Println(r["safe_title"])
+	// 	}
+	// }(chnResults)
+
 	wg.Wait()
+	then := time.Now()
+
 	// <- time.After(1*time.Second)
-	fmt.Println("End of the program")
+	fmt.Printf("End of the program %d\n", then.Sub(now).Milliseconds())
 }
 
 func DownloadComic(comicIndex int) (map[string]interface{}, error) {
